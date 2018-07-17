@@ -1,0 +1,23 @@
+#!/bin/bash
+LTOP=/home/dzy/linux-stable
+STOP=/home/dzy/zfs/spl
+
+cd spl
+git clean -fdx
+sh autogen.sh
+./configure --prefix=/ --libdir=/lib --includedir=/usr/include --datarootdir=/usr/share --enable-linux-builtin=yes --with-linux=$LTOP --with-linux-obj=$LTOP
+cp ../splunifdef .
+./splunifdef
+./copy-builtin $LTOP
+make -j8
+sudo make install -j8
+
+cd ../zfs
+git clean -fdx
+sh autogen.sh
+./configure --prefix=/ --libdir=/lib --includedir=/usr/include --datarootdir=/usr/share --enable-linux-builtin=yes --with-linux=$LTOP --with-linux-obj=$LTOP --with-spl=$STOP --with-spl-obj=$STOP
+cp ../zfsunifdef .
+./zfsunifdef
+./copy-builtin $LTOP
+make -j8
+sudo make install -j8

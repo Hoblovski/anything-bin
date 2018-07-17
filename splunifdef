@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# 文件放到 spl 根目录下, 然后
+#
+# $ ./autogen.sh
+# $ ./configure YOUR_WHATEVER_PARAMETER
+# $ ./splunifdef
+# $ make -s -j8
+# 配置参数
+#	UNIFDEF 是 unifdef 可执行文件的地址.
+#		apt install 得到的是 2.10
+#		我使用 2.11 版本 (源码编译的)
+
+
+#UNIFDEF=~/Programs/unifdef-2.11/unifdef
+
+SPL_DIR=/home/dzy/zfs/spl
+CONFIG_H=$SPL_DIR/spl_config.h
+CONFIG=$SPL_DIR/config
+UNIFDEFARGS="-f $CONFIG_H"
+
+# 抽取 config/kernel-*.m4 中定义的所有宏
+#	zyj 说我们假定和内核版本相关的宏所在的 m4 文件都是 kernel 打头的
+KERNEL_MACROS=$(awk '/AC_DEFINE/{print $0}' $CONFIG/kernel-*.m4 | sed 's/^\s*AC_DEFINE(\([^,]*\),.*/\1/')
+
+echo "Preparing config.h"
+for mac in $KERNEL_MACROS
+do
+	echo "Found macro " ${mac}
+	sed -i "s@/\* \(#undef ${mac}\) \*/@\1@" $CONFIG_H
+done
+
+echo "Working"
+for fname in $(find . -iname "*.[ch]")
+do
+	echo "Substituting" ${fname}
+	unifdef ${UNIFDEFARGS} ${fname} -o ${fname}
+done

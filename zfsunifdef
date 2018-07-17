@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# 文件放到 zfs 根目录下运行
+# UNIFDEF 是 unifdef 可执行文件的地址.
+#	ubuntu仓库中是 2.10, 我使用 2.11 版本
+
+#UNIFDEF=~/Programs/unifdef-2.11/unifdef
+ZFS_DIR=/home/dzy/zfs/zfs
+CONFIG=$ZFS_DIR/config
+CONFIG_H=$ZFS_DIR/zfs_config.h
+UNIFDEFARGS="-f $CONFIG_H"
+
+# 抽取 config/kernel-*.m4 中定义的所有宏
+# 我觉得 config/kernel.m4 这里面的宏照我们的说法是不考虑的
+#	zyj 说我们假定和内核版本相关的宏所在的 m4 文件都是 kernel 打头的
+KERNEL_M4_FILES=`ls $CONFIG/kernel-*.m4`
+KERNEL_MACROS=$(awk '/AC_DEFINE/{print $0}' ${KERNEL_M4_FILES} | sed 's/^\s*AC_DEFINE(\([^,]*\),.*/\1/')
+SPECIAL_DELETE='m4_join(\[_\]'
+# holy shxt can't the zfs people write simpler m4 files? look at the spl people
+KERNEL_MACROS=$(KERNEL_MACROS/$(SPECIAL_DELETE)/)
+KERNEL_MACROS="${KERNEL_MACROS} ZFS_ENUM_NODE_STAT_ITEM_NR_FILE_PAGES ZFS_ENUM_NODE_STAT_ITEM_NR_INACTIVE_ANON ZFS_ENUM_NODE_STAT_ITEM_NR_INACTIVE_FILE ZFS_ENUM_NODE_STAT_ITEM_NR_SLAB_RECLAIMABLE ZFS_ENUM_ZONE_STAT_ITEM_NR_FILE_PAGES ZFS_ENUM_ZONE_STAT_ITEM_NR_INACTIVE_ANON ZFS_ENUM_ZONE_STAT_ITEM_NR_INACTIVE_FILE ZFS_ENUM_ZONE_STAT_ITEM_NR_SLAB_RECLAIMABLE"
+# which moron wrote config/kernel-global_page_state.m4 the stupid piece of crap?
+
+echo "Preparing config.h"
+i=0
+for mac in $KERNEL_MACROS
+do
+	echo "Found macro " ${mac}
+	sed -i "s@/\* \(#undef ${mac}\) \*/@\1@" $CONFIG_H 
+    let "i++"
+done
+echo "A total of $i macros"
+echo ""
+
+echo "Working"
+for fname in $(find . -iname "*.[ch]")
+do
+	echo "Substituting" ${fname}
+	unifdef ${UNIFDEFARGS} ${fname} -o ${fname}
+done
